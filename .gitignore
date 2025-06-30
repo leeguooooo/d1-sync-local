@@ -1,0 +1,4 @@
+node_modules/
+.d1-sync-exports/
+*.log
+.DS_Store
