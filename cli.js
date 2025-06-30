@@ -129,8 +129,11 @@ class D1SyncLocal {
   fixD1Export(inputFile, outputFile) {
     const content = fs.readFileSync(inputFile, 'utf8');
     
+    // Remove or modify PRAGMA defer_foreign_keys
+    let fixedContent = content.replace(/PRAGMA defer_foreign_keys=TRUE;/g, 'PRAGMA foreign_keys=OFF;');
+    
     // Add DROP TABLE IF EXISTS before CREATE TABLE
-    let fixedContent = content.replace(/CREATE TABLE (\w+)/g, 'DROP TABLE IF EXISTS $1;\nCREATE TABLE $1');
+    fixedContent = fixedContent.replace(/CREATE TABLE (\w+)/g, 'DROP TABLE IF EXISTS $1;\nCREATE TABLE $1');
     
     // Fix INSERT statements with missing quotes
     fixedContent = fixedContent.replace(/INSERT INTO (\w+) VALUES\((.*?)\);/gs, (match, tableName, values) => {
@@ -143,6 +146,11 @@ class D1SyncLocal {
       });
       return `INSERT INTO ${tableName} VALUES(${fixedValues.join(',')});`;
     });
+    
+    // Add PRAGMA foreign_keys=ON at the end if not present
+    if (!fixedContent.includes('PRAGMA foreign_keys=ON;')) {
+      fixedContent += '\nPRAGMA foreign_keys=ON;';
+    }
     
     fs.writeFileSync(outputFile, fixedContent);
   }
@@ -314,7 +322,11 @@ PRAGMA foreign_keys = ON;
       // Delete local database files
       const deleteSpinner = ora(t('cleaningLocal', this.lang)).start();
       const deletedCount = await this.deleteLocalDatabase(localDb.database_name);
-      deleteSpinner.succeed(t('cleanedLocal', this.lang, { count: deletedCount }));
+      if (deletedCount > 0) {
+        deleteSpinner.succeed(t('cleanedLocalWithCount', this.lang, { count: deletedCount }));
+      } else {
+        deleteSpinner.succeed(t('cleanedLocal', this.lang));
+      }
       
       // Fix export file
       const fixSpinner = ora(t('processingExport', this.lang)).start();
