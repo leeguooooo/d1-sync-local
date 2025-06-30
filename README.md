@@ -9,6 +9,7 @@ Sync Cloudflare D1 remote databases to your local development environment with e
 - 🛡️ **Safe operation**: Confirms before overwriting local data
 - 📊 **Validation**: Shows synced tables and record counts
 - 🎨 **Beautiful CLI**: Colored output with progress indicators
+- 🌍 **Multi-language**: Auto-detects language (English, 简体中文, 繁體中文, 日本語)
 
 ## Installation
 
@@ -115,6 +116,32 @@ database_id = "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"
 binding = "DB"
 database_name = "my-app-db-production"
 database_id = "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"
+```
+
+## Language Support
+
+The tool automatically detects your system language and displays messages in:
+- **English** (default)
+- **简体中文** (Simplified Chinese)
+- **繁體中文** (Traditional Chinese)
+- **日本語** (Japanese)
+
+### Manual Language Selection
+
+You can override the auto-detected language using the `D1_SYNC_LANG` environment variable:
+
+```bash
+# Use Simplified Chinese
+D1_SYNC_LANG=zh-cn d1-sync-local
+
+# Use Traditional Chinese
+D1_SYNC_LANG=zh-tw d1-sync-local
+
+# Use Japanese
+D1_SYNC_LANG=ja d1-sync-local
+
+# Use English
+D1_SYNC_LANG=en d1-sync-local
 ```
 
 ## Troubleshooting

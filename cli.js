@@ -11,6 +11,10 @@ const ora = require('ora');
 
 const execAsync = promisify(exec);
 const packageJson = require('./package.json');
+const { detectLanguage, t } = require('./locales');
+
+// Detect user language
+const lang = detectLanguage();
 
 // Check for version flag
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
@@ -21,17 +25,17 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
 // Check for help flag
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
-${chalk.bold('d1-sync-local')} - ${packageJson.description}
+${chalk.bold('d1-sync-local')} - ${t('description', lang)}
 
-${chalk.bold('Usage:')}
+${chalk.bold(t('usage', lang) + ':')}
   d1-sync-local    Sync D1 database to local
-  d1sl             Short alias
+  d1sl             ${t('shortAlias', lang)}
 
-${chalk.bold('Options:')}
-  -v, --version    Show version
-  -h, --help       Show help
+${chalk.bold(t('options', lang) + ':')}
+  -v, --version    ${t('showVersion', lang)}
+  -h, --help       ${t('showHelp', lang)}
 
-${chalk.bold('Examples:')}
+${chalk.bold(t('examples', lang) + ':')}
   $ d1-sync-local
   $ d1sl
   $ npx d1-sync-local
@@ -43,11 +47,12 @@ class D1SyncLocal {
   constructor() {
     this.wranglerConfigPath = path.join(process.cwd(), 'wrangler.toml');
     this.exportDir = path.join(process.cwd(), '.d1-sync-exports');
+    this.lang = lang;
   }
 
   async readWranglerConfig() {
     if (!fs.existsSync(this.wranglerConfigPath)) {
-      throw new Error('wrangler.toml not found in current directory');
+      throw new Error(t('configNotFound', this.lang));
     }
 
     const configContent = fs.readFileSync(this.wranglerConfigPath, 'utf-8');
@@ -94,13 +99,13 @@ class D1SyncLocal {
     const choices = Object.entries(databases).map(([key, db]) => ({
       title: `${db.name} (${db.database_name})`,
       value: key,
-      description: `Binding: ${db.binding}`
+      description: `${t('binding', this.lang)}: ${db.binding}`
     }));
 
     const { source } = await prompts({
       type: 'select',
       name: 'source',
-      message: 'Select source database to sync from:',
+      message: t('selectSource', this.lang),
       choices
     });
 
@@ -185,68 +190,68 @@ class D1SyncLocal {
         });
       }
       
-      console.log(chalk.cyan(`\n📊 Synced ${tables.length} tables:`));
+      console.log(chalk.cyan(`\n📊 ${t('syncedTables', this.lang, { count: tables.length })}`));
       
       for (const table of tables) {
         try {
           const countResult = await execAsync(`npx wrangler d1 execute ${databaseName} --local --command="SELECT COUNT(*) as count FROM ${table}"`);
           const match = countResult.stdout.match(/"count":\s*(\d+)/);
           const count = match ? match[1] : '0';
-          console.log(chalk.green(`  ✓ ${table}: ${count} records`));
+          console.log(chalk.green(`  ✓ ${table}: ${count} ${t('records', this.lang)}`));
         } catch (e) {
-          console.log(chalk.yellow(`  ⚠️  ${table}: unable to count`));
+          console.log(chalk.yellow(`  ⚠️  ${table}: ${t('unableToCount', this.lang)}`));
         }
       }
       
       return true;
     } catch (error) {
-      console.warn(chalk.yellow('\n⚠️  Validation failed:'), error.message);
+      console.warn(chalk.yellow(`\n⚠️  ${t('validationFailed', this.lang)}`), error.message);
       return false;
     }
   }
 
   async run() {
-    console.log(chalk.bold.cyan('\n🚀 D1 Sync to Local\n'));
+    console.log(chalk.bold.cyan('\n' + t('title', this.lang) + '\n'));
     
     try {
       // Read wrangler.toml
-      const spinner = ora('Reading wrangler.toml...').start();
+      const spinner = ora(t('readingConfig', this.lang)).start();
       const config = await this.readWranglerConfig();
       const databases = this.parseD1Databases(config);
-      spinner.succeed('Found wrangler.toml');
+      spinner.succeed(t('foundConfig', this.lang));
       
       if (Object.keys(databases).length === 0) {
-        console.error(chalk.red('No D1 databases found in wrangler.toml'));
+        console.error(chalk.red(t('noDatabases', this.lang)));
         process.exit(1);
       }
       
       // Let user select local database
       const localDb = databases.local;
       if (!localDb) {
-        console.error(chalk.red('No local D1 database configuration found'));
+        console.error(chalk.red(t('noLocalDb', this.lang)));
         process.exit(1);
       }
       
-      console.log(chalk.gray(`Local database: ${localDb.database_name}`));
+      console.log(chalk.gray(`${t('localDatabase', this.lang)}: ${localDb.database_name}`));
       
       // Select source database
       const sourceDb = await this.selectDatabase(databases);
       if (!sourceDb) {
-        console.log(chalk.red('No database selected'));
+        console.log(chalk.red(t('noDbSelected', this.lang)));
         return;
       }
       
       // Confirm
-      console.log(chalk.yellow(`\n⚠️  This will sync ${sourceDb.database_name} to local database`));
+      console.log(chalk.yellow(`\n⚠️  ${t('syncWarning', this.lang, { source: sourceDb.database_name })}`));
       const { confirm } = await prompts({
         type: 'confirm',
         name: 'confirm',
-        message: 'All local data will be replaced. Continue?',
+        message: t('confirmReplace', this.lang),
         initial: false
       });
       
       if (!confirm) {
-        console.log(chalk.red('Cancelled'));
+        console.log(chalk.red(t('cancelled', this.lang)));
         return;
       }
       
@@ -256,33 +261,33 @@ class D1SyncLocal {
       }
       
       // Export source database
-      const exportSpinner = ora('Exporting source database...').start();
+      const exportSpinner = ora(t('exportingDb', this.lang)).start();
       const timestamp = new Date().toISOString().replace(/[:]/g, '-').split('.')[0];
       const exportFile = path.join(this.exportDir, `export_${timestamp}.sql`);
       
       await this.executeCommand(
         `npx wrangler d1 export ${sourceDb.database_name} ${sourceDb.envFlag} --output="${exportFile}"`,
         exportSpinner,
-        'Export completed'
+        t('exportComplete', this.lang)
       );
       
       // Delete local database files
-      const deleteSpinner = ora('Cleaning local database...').start();
+      const deleteSpinner = ora(t('cleaningLocal', this.lang)).start();
       const deletedCount = await this.deleteLocalDatabase(localDb.database_name);
-      deleteSpinner.succeed(`Cleaned local database (${deletedCount} files)`);
+      deleteSpinner.succeed(t('cleanedLocal', this.lang, { count: deletedCount }));
       
       // Fix export file
-      const fixSpinner = ora('Processing export file...').start();
+      const fixSpinner = ora(t('processingExport', this.lang)).start();
       const fixedFile = exportFile.replace('.sql', '_fixed.sql');
       this.fixD1Export(exportFile, fixedFile);
-      fixSpinner.succeed('Export file processed');
+      fixSpinner.succeed(t('exportProcessed', this.lang));
       
       // Import to local
-      const importSpinner = ora('Importing to local database...').start();
+      const importSpinner = ora(t('importingLocal', this.lang)).start();
       await this.executeCommand(
         `npx wrangler d1 execute ${localDb.database_name} --local --file="${fixedFile}"`,
         importSpinner,
-        'Import completed'
+        t('importComplete', this.lang)
       );
       
       // Clean up
@@ -292,10 +297,10 @@ class D1SyncLocal {
       // Validate
       await this.validateSync(localDb.database_name);
       
-      console.log(chalk.green.bold('\n✨ Sync completed successfully!\n'));
+      console.log(chalk.green.bold('\n' + t('syncSuccess', this.lang) + '\n'));
       
     } catch (error) {
-      console.error(chalk.red('\n❌ Error:'), error.message);
+      console.error(chalk.red(`\n❌ ${t('error', this.lang)}`), error.message);
       process.exit(1);
     }
   }
