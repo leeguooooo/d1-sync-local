@@ -1,6 +1,6 @@
 {
   "name": "d1-sync-local",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sync Cloudflare D1 remote databases to local development environment",
   "main": "index.js",
   "bin": {

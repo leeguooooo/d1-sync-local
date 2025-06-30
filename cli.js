@@ -10,6 +10,34 @@ const chalk = require('chalk');
 const ora = require('ora');
 
 const execAsync = promisify(exec);
+const packageJson = require('./package.json');
+
+// Check for version flag
+if (process.argv.includes('--version') || process.argv.includes('-v')) {
+  console.log(packageJson.version);
+  process.exit(0);
+}
+
+// Check for help flag
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`
+${chalk.bold('d1-sync-local')} - ${packageJson.description}
+
+${chalk.bold('Usage:')}
+  d1-sync-local    Sync D1 database to local
+  d1sl             Short alias
+
+${chalk.bold('Options:')}
+  -v, --version    Show version
+  -h, --help       Show help
+
+${chalk.bold('Examples:')}
+  $ d1-sync-local
+  $ d1sl
+  $ npx d1-sync-local
+`);
+  process.exit(0);
+}
 
 class D1SyncLocal {
   constructor() {
