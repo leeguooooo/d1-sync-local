@@ -60,6 +60,7 @@ const locales = {
     exportComplete: '导出完成',
     cleaningLocal: '正在清理本地数据库...',
     cleanedLocal: '已清理本地数据库（{count} 个文件）',
+    cleaningDatabase: '正在清理数据库...',
     processingExport: '正在处理导出文件...',
     exportProcessed: '导出文件处理完成',
     importingLocal: '正在导入到本地数据库...',

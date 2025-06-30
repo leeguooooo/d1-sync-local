@@ -148,6 +148,46 @@ class D1SyncLocal {
   }
 
   async deleteLocalDatabase(databaseName) {
+    // First try to drop all tables using SQL
+    try {
+      console.log(chalk.gray(`  ${t('cleaningDatabase', this.lang)}`));
+      
+      // Get all tables
+      const result = await execAsync(`npx wrangler d1 execute ${databaseName} --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"`);
+      const tables = [];
+      const matches = result.stdout.match(/"name":\s*"([^"]+)"/g);
+      if (matches) {
+        matches.forEach(match => {
+          const tableName = match.match(/"name":\s*"([^"]+)"/)[1];
+          tables.push(tableName);
+        });
+      }
+      
+      if (tables.length > 0) {
+        // Create SQL to drop all tables
+        const dropSQL = `
+PRAGMA foreign_keys = OFF;
+${tables.map(table => `DROP TABLE IF EXISTS ${table};`).join('\n')}
+PRAGMA foreign_keys = ON;
+`;
+        
+        // Write to temp file and execute
+        const tempFile = path.join(require('os').tmpdir(), `d1-sync-drop-${Date.now()}.sql`);
+        fs.writeFileSync(tempFile, dropSQL);
+        
+        try {
+          await execAsync(`npx wrangler d1 execute ${databaseName} --local --file="${tempFile}"`);
+        } finally {
+          if (fs.existsSync(tempFile)) {
+            fs.unlinkSync(tempFile);
+          }
+        }
+      }
+    } catch (error) {
+      // If SQL cleanup fails, try file deletion
+    }
+    
+    // Also try to delete database files
     const wranglerDir = path.join(process.cwd(), '.wrangler');
     let deletedCount = 0;
     
@@ -160,7 +200,7 @@ class D1SyncLocal {
           
           if (stat.isDirectory()) {
             findDbFiles(fullPath);
-          } else if (file.includes(databaseName)) {
+          } else if (file.includes(databaseName) && (file.endsWith('.db') || file.endsWith('.sqlite'))) {
             try {
               fs.unlinkSync(fullPath);
               deletedCount++;
